@@ -1,0 +1,2571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Morgobyte - Offline Yoto Player</title>
+    <meta name="description" content="Offline audio card player for Yoto">
+    <meta name="theme-color" content="#FCC921">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/png" href="/static/images/favicon_64.png">
+    <link rel="apple-touch-icon" href="/static/images/favicon_64.png">
+    <link rel="stylesheet" href="/static/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/static/css/solid.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        @font-face {
+            font-family: 'PixelFont';
+            src: url('/static/fonts/pixelfont.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'TitleFont';
+            src: url('/static/fonts/Comfortaa-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            font-family: 'TitleFont', sans-serif;
+            background-image: url('/static/images/musicbg_vector.svg');
+            background-size:1000px;
+        }
+
+        .header {
+            background: #2a2a2a;
+            color: white;
+            padding: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-bottom: 3px solid #FCC921;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sitename {
+            color: #FCC921;
+            font-family: 'PixelFont', sans-serif;
+            font-size: 32px;   
+        }
+        .tagline {
+            font-family: 'TitleFont', sans-serif;
+            font-size:22px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .library-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            border: 3px solid #e0e0e0;
+        }
+
+        .library-card:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .library-card[data-cached="true"] {
+            border-color: #96BA00;
+        }
+        
+        .library-card[data-cached="true"]:hover {
+            box-shadow: 0 0 20px 10px rgba(150, 186, 0, 0.6);
+        }
+        
+        .library-card[data-cached="false"][data-online="true"] {
+            border-color: #30B8E8;
+        }
+        
+        .library-card[data-cached="false"][data-online="true"]:hover {
+            box-shadow: 0 0 20px 10px rgba(48, 184, 232, 0.6);
+        }
+        
+        .library-card[data-cached="false"][data-online="false"] {
+            border-color: #DF2300;
+        }
+        
+        .library-card[data-cached="false"][data-online="false"]:hover {
+            box-shadow: 0 0 20px 10px rgba(223, 35, 0, 0.6);
+        }
+
+        .library-card-image {
+            width: 100%;
+            aspect-ratio: 0.63; /* Vertical card ratio */
+            object-fit: cover;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+            overflow: hidden;
+        }
+
+        .library-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .library-card-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .library-card-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.3;
+            padding: 8px;
+            border-radius: 0;
+            height:100%;
+        }
+        
+        .library-card[data-cached="true"] .library-card-title {
+            background: #96BA00;
+            color: white;
+        }
+        
+        .library-card[data-cached="false"][data-online="true"] .library-card-title {
+            background: #30B8E8;
+            color: white;
+        }
+        
+        .library-card[data-cached="false"][data-online="false"] .library-card-title {
+            background: #DF2300;
+            color: white;
+        }
+
+        .library-card-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .library-card-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 8px;
+        }
+
+        .type-playlist {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .type-chapter {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .type-podcast {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .type-audiobook {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn {
+            background: #FCC921;
+            color: #2a2a2a;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .btn:hover {
+            background: #e5c918;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .success-message {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 1200px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .modal-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .modal-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .modal-btn-primary {
+            background: #FCC921;
+            color: #2a2a2a;
+            font-weight: 600;
+        }
+        
+        .modal-btn-primary:hover {
+            background: #e5c918;
+        }
+        
+        .modal-btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .modal-btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .modal-btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        }
+        
+        .modal-btn-danger:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 32px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .modal-close:hover {
+            background: #f0f0f0;
+        }
+
+        .modal-body {
+            display: flex;
+            gap: 32px;
+            padding: 24px;
+        }
+
+        .detail-image {
+            flex-shrink: 0;
+            width: 300px;
+        }
+
+        .detail-image img {
+            width: 100%;
+            aspect-ratio: 0.63;
+            object-fit: cover;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .detail-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .detail-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .detail-author {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .chapter-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .chapter-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chapter-item-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+            width: 0%;
+            transition: width 0.1s linear;
+            pointer-events: none;
+        }
+        
+        .chapter-item-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .chapter-item:hover {
+            background: #e8e8e8;
+        }
+        
+        .chapter-item.playing {
+            background: #f0f0ff;
+        }
+
+        .chapter-number {
+            font-weight: 600;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .chapter-title {
+            flex: 1;
+            font-size: 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .chapter-duration {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .chapter-controls {
+            display: flex;
+            gap: 4px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .chapter-control-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        
+        .chapter-control-btn:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .chapter-control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Now Playing Bar */
+        .now-playing-bar {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2a2a2a;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            padding: 12px;
+            display: none;
+            flex-direction: row;
+            gap: 12px;
+            z-index: 999;
+            border-radius: 12px;
+            border: 2px solid #FCC921;
+            width: 500px;
+            align-items: center;
+        }
+        
+        .now-playing-bar.active {
+            display: flex;
+        }
+        
+        .now-playing-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .now-playing-controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            width: 100%;
+        }
+        
+        .now-playing-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: linear-gradient(135deg, #FCC921 0%, #f0a500 100%);
+            color: #2a2a2a;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 16px;
+        }
+        
+        .now-playing-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(252, 201, 33, 0.5);
+        }
+        
+        .now-playing-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .now-playing-image {
+            width: 100px;
+            height: 158px;
+            border-radius: 8px;
+            object-fit: cover;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        
+        .now-playing-track-icon {
+            width: 48px;
+            height: 48px;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            align-self: flex-start;
+        }
+        
+        .now-playing-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            cursor: pointer;
+            gap: 4px;
+        }
+        
+        .now-playing-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #FCC921;
+            margin-bottom: 4px;
+        }
+        
+        .now-playing-subtitle {
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .now-playing-progress {
+            width: 100%;
+            height: 6px;
+            background: #444;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        
+        .now-playing-progress-bar {
+            height: 100%;
+            background: #FCC921;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        /* Offline Warning Banner */
+        .offline-warning {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff6b6b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+            display: none;
+            align-items: center;
+            gap: 12px;
+            z-index: 1001;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .offline-warning.show {
+            display: flex;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+        
+        .offline-warning-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        
+        .offline-warning-close:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo" style="font-size:24px;">
+                <img src="/static/images/logo1.png" alt="Morgobyte Logo" style="height:50px;vertical-align: text-bottom;">
+                <span class="sitename">Morgobyte</span> - <span class="tagline">Offline Audio Card Player</span>
+            </div>
+            <div class="status-indicator" onclick="toggleOnlineMode()" id="statusIndicator" title="Click to toggle online/offline mode">
+                <i class="fa-solid fa-circle" id="statusIcon" style="color: #4caf50;"></i>
+                <span class="status-text" id="statusText">Online</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Offline Warning Banner -->
+    <div class="offline-warning" id="offlineWarning">
+        <span id="offlineWarningText"><i class="fa-solid fa-triangle-exclamation"></i> This feature is not available in offline mode</span>
+        <button class="offline-warning-close" onclick="hideOfflineWarning()">×</button>
+    </div>
+
+    <div class="container">
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Your Library</h2>
+                <div style="text-align: right;">
+                    <button class="btn" onclick="fetchFromYoto()" id="refreshBtn"><i class="fa-solid fa-rotate"></i> Load from Yoto</button>
+                    <div id="lastRefreshText" style="color: #666; font-size: 12px; margin-top: 5px;"></div>
+                </div>
+            </div>
+            <div id="progressContainer" style="display: none; margin-bottom: 20px;">
+                <div style="margin-bottom: 8px; color: #666; font-size: 14px;" id="progressText">Fetching cards...</div>
+                <div style="width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                    <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s;"></div>
+                </div>
+            </div>
+            <div id="libraryContainer" class="loading">
+                <div class="spinner"></div>
+                <p>Loading cached library...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h2>Card Details</h2>
+                    <div class="modal-actions">
+                        <button class="modal-btn modal-btn-primary" onclick="saveCardLocally()" id="saveCardBtn" style="display: none;">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Card Locally
+                        </button>
+                        <button class="modal-btn modal-btn-danger" onclick="clearCardData()" id="clearCardBtn" style="display: none;">
+                            <i class="fa-solid fa-trash-can"></i> Clear Local Data (<span id="cardDataSize">0 MB</span>)
+                        </button>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeDetailModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Danger Zone Toggle -->
+    <div style="text-align: center; margin: 40px 0 20px 0;">
+        <a href="#" onclick="openAdvancedOptions(event)" style="color: #999; font-size: 12px; text-decoration: none; border-bottom: 1px dotted #999;">
+            Advanced Options
+        </a>
+    </div>
+    
+    <!-- Advanced Options Modal -->
+    <div id="advancedModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 style="margin: 0; color: #333;"><i class="fa-solid fa-gear"></i> Advanced Options</h2>
+                <button onclick="closeAdvancedOptions()" class="btn" style="background: #999; border-color: #999; padding: 8px 16px;">
+                    ✕ Close
+                </button>
+            </div>
+            <div style="padding: 24px;">
+                <!-- Storage Info Section -->
+                <div style="padding: 16px; background: #f8f8f8; border-radius: 8px; font-size: 14px; color: #666; margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 12px 0; color: #333; font-size: 16px;"><i class="fa-solid fa-floppy-disk"></i> Storage Information</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Locally Cached Audio:</span>
+                        <span id="cachedSize" style="font-weight: 600; color: #667eea;">Calculating...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                        <span>Storage Quota:</span>
+                        <span id="storageQuota" style="font-weight: 600; color: #764ba2;">Checking...</span>
+                    </div>
+                    <div style="margin-top: 12px; width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
+                        <div id="storageBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                        <span>Service Worker:</span>
+                        <span id="swStatus" style="font-weight: 600; color: #999;">Checking...</span>
+                    </div>
+                </div>
+                
+                <!-- Danger Zone Section -->
+                <div style="border: 2px solid #dc3545; background: #fff5f5; padding: 20px; border-radius: 8px;">
+                    <h3 style="color: #dc3545; margin: 0 0 15px 0; font-size: 16px;"><i class="fa-solid fa-triangle-exclamation"></i> Danger Zone</h3>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+                        Clear all cached data including audio files, library information, and settings. This action cannot be undone.
+                    </p>
+                    <p style="color: #666; margin-bottom: 10px; font-size: 13px; font-weight: bold;">
+                        Type <code style="background: #fff; padding: 2px 6px; border: 1px solid #ddd;">delete</code> to confirm:
+                    </p>
+                    <input type="text" id="deleteConfirm" placeholder="Type 'delete' to confirm" 
+                           style="width: 100%; max-width: 300px; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
+                    <br>
+                    <button class="btn" onclick="clearAllData()" id="clearDataBtn" disabled 
+                            style="background: #999; border-color: #999; cursor: not-allowed;">
+                        <i class="fa-solid fa-trash-can"></i> Clear All Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Now Playing Bar -->
+    <div class="now-playing-bar" id="nowPlayingBar">
+        <img class="now-playing-image" id="nowPlayingImage" onclick="openNowPlayingCard()">
+        <div class="now-playing-content">
+            <div class="now-playing-info" onclick="openNowPlayingCard()">
+                <img class="now-playing-track-icon" id="nowPlayingTrackIcon" alt="" style="display: none;">
+                <div class="now-playing-title" id="nowPlayingTitle"></div>
+                <div class="now-playing-subtitle" id="nowPlayingSubtitle"></div>
+            </div>
+            <div class="now-playing-controls">
+                <button class="now-playing-btn" onclick="audioPlayer.previous()" title="Previous"><i class="fa-solid fa-backward-step"></i></button>
+                <button class="now-playing-btn" onclick="audioPlayer.togglePlayPause()" id="nowPlayingPlayPause" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
+                <button class="now-playing-btn" onclick="audioPlayer.next()" title="Next"><i class="fa-solid fa-forward-step"></i></button>
+                <button class="now-playing-btn" onclick="audioPlayer.stop()" title="Stop"><i class="fa-solid fa-stop"></i></button>
+            </div>
+            <div class="now-playing-progress">
+                <div class="now-playing-progress-bar" id="nowPlayingProgressBar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hidden Audio Element -->
+    <audio id="audioElement" preload="auto"></audio>
+
+    <script>
+        // IndexedDB setup
+        let db;
+        const dbName = 'YotoLocalDB';
+
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, 4);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    console.log('Database opened, version:', db.version);
+                    console.log('Object stores:', Array.from(db.objectStoreNames));
+                    resolve(db);
+                };
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    console.log('Upgrading database from version', event.oldVersion, 'to', event.newVersion);
+                    
+                    // Create stores only if they don't exist
+                    if (!db.objectStoreNames.contains('settings')) {
+                        console.log('Creating settings store');
+                        db.createObjectStore('settings', { keyPath: 'key' });
+                    }
+                    if (!db.objectStoreNames.contains('players')) {
+                        console.log('Creating players store with keyPath: deviceId');
+                        db.createObjectStore('players', { keyPath: 'deviceId' });
+                    }
+                    if (!db.objectStoreNames.contains('library')) {
+                        console.log('Creating library store with keyPath: cardId');
+                        db.createObjectStore('library', { keyPath: 'cardId' });
+                    }
+                    if (!db.objectStoreNames.contains('images')) {
+                        console.log('Creating images store with keyPath: url');
+                        db.createObjectStore('images', { keyPath: 'url' });
+                    }
+                };
+            });
+        }
+
+        async function getFromDB(storeName, key) {
+            return new Promise(async (resolve, reject) => {
+                console.log(`getFromDB: storeName=${storeName}, key=${key}`);
+                if (!db) {
+                    console.warn('getFromDB: db is not initialized, initializing now...');
+                    await initDB();
+                    if (!db) {
+                        console.error('getFromDB: failed to initialize db');
+                        resolve(null);
+                        return;
+                    }
+                }
+                if (!db.objectStoreNames.contains(storeName)) {
+                    console.warn(`getFromDB: store '${storeName}' does not exist`);
+                    resolve(null);
+                    return;
+                }
+                const transaction = db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(key);
+                request.onsuccess = () => {
+                    // For 'settings' store, data is stored as {key, value}
+                    // For other stores (library, players, images), data is stored directly
+                    const result = storeName === 'settings' ? request.result?.value : request.result;
+                    console.log(`getFromDB: result for ${key} =`, result ? 'FOUND' : 'NULL');
+                    resolve(result);
+                };
+                request.onerror = () => {
+                    console.error(`getFromDB: error for ${key}:`, request.error);
+                    reject(request.error);
+                };
+            });
+        }
+
+        async function saveToDB(storeName, data) {
+            return new Promise(async (resolve, reject) => {
+                if (!db) {
+                    console.warn('saveToDB: db is not initialized, initializing now...');
+                    await initDB();
+                    if (!db) {
+                        console.error('saveToDB: failed to initialize db');
+                        resolve();
+                        return;
+                    }
+                }
+                // Check if store exists first
+                if (!db.objectStoreNames.contains(storeName)) {
+                    console.log(`Store '${storeName}' does not exist, skipping save`);
+                    resolve();
+                    return;
+                }
+                const transaction = db.transaction([storeName], 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.put(data);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getAllFromDB(storeName) {
+            return new Promise(async (resolve, reject) => {
+                if (!db) {
+                    console.warn('getAllFromDB: db is not initialized, initializing now...');
+                    await initDB();
+                    if (!db) {
+                        console.error('getAllFromDB: failed to initialize db');
+                        resolve([]);
+                        return;
+                    }
+                }
+                // Check if store exists first
+                if (!db.objectStoreNames.contains(storeName)) {
+                    console.log(`Store '${storeName}' does not exist yet`);
+                    resolve([]);
+                    return;
+                }
+                const transaction = db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function cacheImage(url) {
+            if (!url) return null;
+            
+            try {
+                // Check if already cached
+                const cached = await getFromDB('images', url);
+                if (cached) {
+                    console.log('Image already cached:', url);
+                    return cached;
+                }
+                
+                // Download and cache
+                console.log('Downloading image:', url);
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const dataUrl = await blobToDataUrl(blob);
+                
+                // Save to IndexedDB
+                await saveToDB('images', { url: url, data: dataUrl, cachedAt: new Date().toISOString() });
+                console.log('Image cached:', url);
+                return dataUrl;
+            } catch (error) {
+                console.error('Failed to cache image:', url, error);
+                return null;
+            }
+        }
+        
+        async function getCachedImage(url) {
+            if (!url) return null;
+            try {
+                const cached = await getFromDB('images', url);
+                return cached || null;
+            } catch (error) {
+                console.error('Failed to get cached image:', url, error);
+                return null;
+            }
+        }
+        
+        function blobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function clearStore(storeName) {
+            return new Promise((resolve, reject) => {
+                // Check if store exists first
+                if (!db.objectStoreNames.contains(storeName)) {
+                    console.log(`Store '${storeName}' does not exist, skipping clear`);
+                    resolve();
+                    return;
+                }
+                const transaction = db.transaction([storeName], 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.clear();
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function fetchPlayers() {
+            try {
+                const accessToken = await getFromDB('settings', 'accessToken');
+                const refreshToken = await getFromDB('settings', 'refreshToken');
+                const clientId = await getFromDB('settings', 'clientId');
+                const clientSecret = await getFromDB('settings', 'clientSecret');
+                
+                const response = await fetch('/api/players/', {
+                    headers: {
+                        'X-Access-Token': accessToken || '',
+                        'X-Refresh-Token': refreshToken || '',
+                        'X-Client-Id': clientId || '',
+                        'X-Client-Secret': clientSecret || ''
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to fetch players');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Save to IndexedDB
+                    await clearStore('players');
+                    const players = data.data.players || data.data;
+                    if (Array.isArray(players)) {
+                        for (const player of players) {
+                            await saveToDB('players', player);
+                        }
+                    }
+                    return players;
+                }
+                throw new Error(data.message);
+            } catch (error) {
+                console.error('Error fetching players:', error);
+                throw error;
+            }
+        }
+
+        async function fetchLibrary() {
+            // Check if offline mode is enabled
+            if (!await isOnlineMode()) {
+                showOfflineWarning('<i class="fa-solid fa-triangle-exclamation"></i> Cannot load from Yoto in offline mode');
+                return;
+            }
+            
+            try {
+                const accessToken = await getFromDB('settings', 'accessToken');
+                const refreshToken = await getFromDB('settings', 'refreshToken');
+                const clientId = await getFromDB('settings', 'clientId');
+                const clientSecret = await getFromDB('settings', 'clientSecret');
+                
+                const response = await fetch('/api/library/', {
+                    headers: {
+                        'X-Access-Token': accessToken || '',
+                        'X-Refresh-Token': refreshToken || '',
+                        'X-Client-Id': clientId || '',
+                        'X-Client-Secret': clientSecret || ''
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to fetch library');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Save to IndexedDB
+                    await clearStore('library');
+                    const items = data.data.items || data.data;
+                    if (Array.isArray(items)) {
+                        console.log(`Fetching full details for ${items.length} cards...`);
+                        updateProgress(0, items.length, 'Fetching card details...');
+                        
+                        for (let i = 0; i < items.length; i++) {
+                            const item = items[i];
+                            try {
+                                // Fetch full card details (without playable URLs to save space)
+                                const cardDetails = await fetchCardDetailForCache(item.cardId, accessToken, refreshToken, clientId, clientSecret);
+                                
+                                // Merge the details into the item
+                                const fullItem = {
+                                    ...item,
+                                    content: cardDetails.content,
+                                    metadata: cardDetails.metadata || item.metadata
+                                };
+                                
+                                // Cache the card image
+                                const cover = fullItem.metadata?.cover || {};
+                                const imageUrl = cover.imageL || cover.imageM || cover.imageS;
+                                if (imageUrl) {
+                                    await cacheImage(imageUrl);
+                                }
+                                
+                                // Cache track icons
+                                const chapters = fullItem.content?.chapters || [];
+                                for (const chapter of chapters) {
+                                    const iconUrl = chapter.display?.icon16x16;
+                                    if (iconUrl) {
+                                        await cacheImage(iconUrl);
+                                    }
+                                }
+                                
+                                await saveToDB('library', fullItem);
+                                console.log(`Cached ${i + 1}/${items.length}: ${item.title}`);
+                                updateProgress(i + 1, items.length, `Cached ${i + 1}/${items.length}: ${item.title}`);
+                            } catch (error) {
+                                console.error(`Failed to fetch details for ${item.cardId}:`, error);
+                                // Save basic item even if detail fetch fails
+                                await saveToDB('library', item);
+                                updateProgress(i + 1, items.length, `Cached ${i + 1}/${items.length} (with errors)`);
+                            }
+                        }
+                        console.log('All cards cached successfully');
+                    }
+                    
+                    // Store the refresh timestamp
+                    const now = new Date();
+                    await saveToDB('settings', { key: 'lastRefresh', value: now.toISOString() });
+                    updateLastRefreshDisplay();
+                    
+                    return items;
+                }
+                throw new Error(data.message);
+            } catch (error) {
+                console.error('Error fetching library:', error);
+                throw error;
+            }
+        }
+
+        async function fetchCardDetailForCache(cardId, accessToken, refreshToken, clientId, clientSecret) {
+            // Fetch card details WITHOUT playable=true to avoid large signed URLs
+            const response = await fetch(`/api/card/${cardId}/`, {
+                headers: {
+                    'X-Access-Token': accessToken,
+                    'X-Refresh-Token': refreshToken,
+                    'X-Client-Id': clientId,
+                    'X-Client-Secret': clientSecret
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.status === 'error') {
+                throw new Error(result.message);
+            }
+
+            const data = result.data;
+            return data.card || data;
+        }
+
+        function renderPlayers(players) {
+            const container = document.getElementById('playersContainer');
+            
+            if (!players || players.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fa-solid fa-music"></i></div>
+                        <p>No players found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            
+            players.forEach(player => {
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.innerHTML = `
+                    <h3>${player.name || 'Unnamed Player'}</h3>
+                    <p>ID: ${player.id || 'N/A'}</p>
+                    <p>Status: ${player.online ? '🟢 Online' : '⚫ Offline'}</p>
+                `;
+                grid.appendChild(item);
+            });
+            
+            container.innerHTML = '';
+            container.appendChild(grid);
+        }
+
+        async function renderLibrary(items) {
+            const container = document.getElementById('libraryContainer');
+            
+            if (!items || items.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fa-solid fa-book"></i></div>
+                        <p>No library items found</p>
+                        <p style="font-size: 14px; margin-top: 10px;">Click "Load from Yoto" to load your library</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            
+            for (const item of items) {
+                const card = document.createElement('div');
+                card.className = 'library-card';
+                card.onclick = () => showItemDetails(item);
+                
+                // Determine if audio is cached locally
+                const hasAudioCached = !!(item.cachedAudio && Object.keys(item.cachedAudio).length > 0);
+                
+                // Get online mode status
+                const isOnline = window.onlineModeValue !== false;
+                
+                // Set data attributes for styling
+                card.setAttribute('data-cached', String(hasAudioCached));
+                card.setAttribute('data-online', String(isOnline));
+                
+                // Get metadata
+                const metadata = item.metadata || {};
+                const title = item.title || item.metadata?.title || item.name || 'Untitled';
+                const author = item.metadata?.author || item.author || '';
+                
+                // Get image URL and check cache
+                const cover = metadata.cover || {};
+                const imageUrl = cover.imageL || cover.imageM || cover.imageS || null;
+                
+                // Try to get cached image
+                let imageSrc = imageUrl;
+                if (imageUrl) {
+                    const cached = await getCachedImage(imageUrl);
+                    if (cached) {
+                        imageSrc = cached;  // cached is the data URL
+                    }
+                }
+                
+                card.innerHTML = `
+                    <div class="library-card-image">
+                        ${imageSrc ? `<img src="${imageSrc}" alt="${title}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-music&quot;&gt;&lt;/i&gt;'" data-original-url="${imageUrl || ''}">` : '<i class="fa-solid fa-music"></i>'}
+                    </div>
+                    <div class="library-card-content">
+                        <div class="library-card-title">${title}</div>
+                        ${author ? `<div class="library-card-meta">${author}</div>` : ''}
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+            
+            container.innerHTML = '';
+            container.appendChild(grid);
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            }
+            return `${minutes}m`;
+        }
+
+        function showItemDetails(item) {
+            console.log('Loading details for card:', item.cardId);
+            openDetailModal(item);
+        }
+
+        async function openDetailModal(item) {
+            const modal = document.getElementById('detailModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            // Show modal with loading state
+            modal.classList.add('active');
+            modalBody.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading details...</p></div>';
+            
+            try {
+                // First, try to get from cached data
+                let cardDetails = item;
+                
+                // If cached item doesn't have content.chapters, fetch from API
+                if (!item.content || !item.content.chapters || item.content.chapters.length === 0) {
+                    // Check if we're in offline mode
+                    if (!await isOnlineMode()) {
+                        showOfflineWarning('<i class="fa-solid fa-triangle-exclamation"></i> Cannot load card details in offline mode. Please cache the card first while online.');
+                        // Render minimal card info with warning
+                        await renderCardDetails(item, item);
+                        // Show the warning inside the modal
+                        const modalWarning = document.getElementById('modalOfflineWarning');
+                        if (modalWarning) {
+                            modalWarning.style.display = 'flex';
+                        }
+                        return;
+                    }
+                    
+                    console.log('No cached chapters, fetching from API...');
+                    cardDetails = await fetchCardDetail(item.cardId);
+                } else {
+                    console.log('Using cached card details');
+                }
+                
+                await renderCardDetails(cardDetails, item);
+            } catch (error) {
+                console.error('Error loading card details:', error);
+                modalBody.innerHTML = `<div class="error">Failed to load details: ${error.message}</div>`;
+            }
+        }
+
+        async function fetchCardDetail(cardId) {
+            console.log('Fetching credentials from IndexedDB...');
+            const accessToken = await getFromDB('settings', 'accessToken');
+            const refreshToken = await getFromDB('settings', 'refreshToken');
+            const clientId = await getFromDB('settings', 'clientId');
+            const clientSecret = await getFromDB('settings', 'clientSecret');
+
+            console.log('Credentials:', {
+                accessToken: accessToken ? `${accessToken.substring(0, 20)}...` : 'MISSING',
+                refreshToken: refreshToken ? `${refreshToken.substring(0, 20)}...` : 'MISSING',
+                clientId: clientId ? `${clientId.substring(0, 20)}...` : 'MISSING',
+                clientSecret: clientSecret ? 'present' : 'MISSING'
+            });
+
+            if (!accessToken) {
+                throw new Error('No access token found. Please go to Settings and complete OAuth setup.');
+            }
+
+            const response = await fetch(`/api/card/${cardId}/`, {
+                headers: {
+                    'X-Access-Token': accessToken,
+                    'X-Refresh-Token': refreshToken,
+                    'X-Client-Id': clientId,
+                    'X-Client-Secret': clientSecret
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.status === 'error') {
+                throw new Error(result.message);
+            }
+
+            // The Yoto API returns the card wrapped in a 'card' property
+            const data = result.data;
+            return data.card || data;
+        }
+
+        async function renderCardDetails(cardDetails, item) {
+            const modalBody = document.getElementById('modalBody');
+            
+            // console.log('=== renderCardDetails ===');
+            // console.log('cardDetails:', cardDetails);
+            // console.log('cardDetails.content:', cardDetails.content);
+            // console.log('cardDetails.content?.chapters:', cardDetails.content?.chapters);
+            
+            const metadata = cardDetails.metadata || item.metadata || {};
+            const cover = metadata.cover || {};
+            const imageUrl = cover.imageL || cover.imageM || cover.imageS || null;
+            const title = cardDetails.title || item.title || 'Untitled';
+            const author = metadata.author || '';
+            
+            // Chapters are in content.chapters (they might be songs/tracks)
+            const content = cardDetails.content || {};
+            const chapters = content.chapters || [];
+            
+            // console.log(`Found ${chapters.length} chapters/tracks`);
+            
+            // Determine if these are songs or chapters based on content type
+            const contentType = content.activity || 'content';
+            const itemLabel = contentType.includes('Music') || contentType.includes('music') ? 'Songs' : 'Chapters';
+            
+            let chaptersHtml = '';
+            if (chapters.length > 0) {
+                chaptersHtml = '<div class="chapter-list">';
+                
+                // Pre-load all track icons from cache
+                const iconPromises = chapters.map(async (chapter) => {
+                    const iconUrl = chapter.display?.icon16x16;
+                    if (iconUrl) {
+                        const cached = await getCachedImage(iconUrl);
+                        return cached || iconUrl;
+                    }
+                    return null;
+                });
+                const iconSources = await Promise.all(iconPromises);
+                
+                chapters.forEach((chapter, index) => {
+                    const duration = chapter.duration ? formatDuration(chapter.duration) : '';
+                    const chapterTitle = chapter.title || `Track ${index + 1}`;
+                    const iconSrc = iconSources[index];
+                    const iconHtml = iconSrc ? `<img src="${iconSrc}" alt="" style="width: 48px; height: 48px; margin-right: 8px; vertical-align: middle; image-rendering: pixelated; image-rendering: crisp-edges;">` : '';
+                    
+                    chaptersHtml += `
+                        <div class="chapter-item" id="chapter-${cardDetails.cardId}-${index}" data-card-id="${cardDetails.cardId}" data-chapter-index="${index}">
+                            <div class="chapter-item-progress" id="progress-${cardDetails.cardId}-${index}"></div>
+                            <div class="chapter-item-content">
+                                <span class="chapter-number">${index + 1}</span>
+                                ${iconHtml}
+                                <span class="chapter-title" onclick="audioPlayer.playChapter('${cardDetails.cardId}', ${index})">${chapterTitle}</span>
+                                ${duration ? `<span class="chapter-duration">${duration}</span>` : ''}
+                            </div>
+                            <div class="chapter-controls">
+                                <button class="chapter-control-btn" onclick="audioPlayer.playChapter('${cardDetails.cardId}', ${index})" title="Play"><i class="fa-solid fa-play"></i></button>
+                                <button class="chapter-control-btn" onclick="audioPlayer.pause()" title="Pause"><i class="fa-solid fa-pause"></i></button>
+                                <button class="chapter-control-btn" onclick="audioPlayer.stop()" title="Stop"><i class="fa-solid fa-stop"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+                chaptersHtml += '</div>';
+            } else {
+                chaptersHtml = '<p style="color: #999;">No tracks available</p>';
+            }
+            
+            modalBody.innerHTML = `
+                <div class="detail-image">
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${title}">` : '<div style="width: 100%; aspect-ratio: 0.63; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 72px;"><i class="fa-solid fa-music"></i></div>'}
+                </div>
+                <div class="detail-content">
+                    <div class="offline-warning show" id="modalOfflineWarning" style="position: relative; top: 0; left: 0; transform: none; margin-bottom: 16px; display: none;">
+                        <span><i class="fa-solid fa-triangle-exclamation"></i> Card details not cached. Switch to online mode to load.</span>
+                        <button class="offline-warning-close" onclick="document.getElementById('modalOfflineWarning').style.display='none'">×</button>
+                    </div>
+                    <div class="detail-title">${title}</div>
+                    ${author ? `<div class="detail-author">${author}</div>` : ''}
+                    <h3 style="margin-bottom: 16px;">${itemLabel} (${chapters.length})</h3>
+                    ${chaptersHtml}
+                </div>
+            `;
+            
+            // Store chapter data for playback
+            window.currentCardData = cardDetails;
+            
+            // Update save/clear buttons
+            updateCardButtons();
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+        
+        async function saveCardLocally() {
+            // Check if offline mode is enabled
+            if (!await isOnlineMode()) {
+                showOfflineWarning('<i class="fa-solid fa-triangle-exclamation"></i> Cannot download audio in offline mode');
+                return;
+            }
+            
+            const cardData = window.currentCardData;
+            if (!cardData || !cardData.cardId) {
+                alert('No card data available');
+                return;
+            }
+            
+            const btn = document.getElementById('saveCardBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
+            
+            try {
+                // Fetch the card with playable URLs
+                const accessToken = await getFromDB('settings', 'accessToken');
+                const refreshToken = await getFromDB('settings', 'refreshToken');
+                const clientId = await getFromDB('settings', 'clientId');
+                const clientSecret = await getFromDB('settings', 'clientSecret');
+                
+                const response = await fetch(`/api/card/${cardData.cardId}/?playable=true`, {
+                    headers: {
+                        'X-Access-Token': accessToken,
+                        'X-Refresh-Token': refreshToken,
+                        'X-Client-Id': clientId,
+                        'X-Client-Secret': clientSecret
+                    }
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'error') throw new Error(result.message);
+                
+                const playableCard = result.data.card || result.data;
+                
+                // Download and cache all audio files
+                const chapters = playableCard.content?.chapters || [];
+                let cachedAudio = {};
+                
+                for (let i = 0; i < chapters.length; i++) {
+                    const chapter = chapters[i];
+                    const track = chapter.tracks?.[0];
+                    if (track?.trackUrl) {
+                        try {
+                            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Downloading ${i + 1}/${chapters.length}...`;
+                            const audioResponse = await fetch(track.trackUrl);
+                            const audioBlob = await audioResponse.blob();
+                            
+                            // Convert blob to base64 for IndexedDB storage
+                            const base64Audio = await blobToBase64(audioBlob);
+                            cachedAudio[i] = {
+                                data: base64Audio,
+                                size: audioBlob.size,
+                                format: track.format
+                            };
+                        } catch (error) {
+                            console.error(`Failed to download track ${i}:`, error);
+                        }
+                    }
+                }
+                
+                // Save the card with cached audio to IndexedDB
+                const cachedCard = {
+                    ...cardData,
+                    cachedAudio: cachedAudio,
+                    cachedAt: new Date().toISOString()
+                };
+                
+                await saveToDB('library', cachedCard);
+                console.log('[saveCardLocally] Saved to DB, now reloading from DB...');
+                
+                // Reload the card from database to ensure we have the latest data
+                const reloadedCard = await getFromDB('library', cachedCard.cardId);
+                console.log('[saveCardLocally] Reloaded card:', reloadedCard ? 'EXISTS' : 'NULL');
+                if (reloadedCard) {
+                    console.log('[saveCardLocally] Reloaded card has cachedAudio:', !!reloadedCard.cachedAudio);
+                    if (reloadedCard.cachedAudio) {
+                        console.log('[saveCardLocally] cachedAudio keys:', Object.keys(reloadedCard.cachedAudio));
+                    }
+                }
+                
+                // Update the card data and buttons
+                window.currentCardData = reloadedCard || cachedCard;
+                console.log('[saveCardLocally] Set window.currentCardData, calling updateCardButtons...');
+                updateCardButtons();
+                
+                // Refresh the library view to show updated card borders
+                await loadCachedData();
+                
+                // Update storage info on main page
+                await updateStorageInfo();
+                
+            } catch (error) {
+                console.error('Error saving card locally:', error);
+                alert('Failed to save card: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '💾 Save Card Locally';
+            }
+        }
+        
+        async function clearCardData() {
+            const cardData = window.currentCardData;
+            if (!cardData || !cardData.cardId) {
+                alert('No card data available');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to clear the cached audio for this card?')) {
+                return;
+            }
+            
+            try {
+                // Remove cached audio but keep metadata
+                const clearedCard = {
+                    ...cardData,
+                    cachedAudio: undefined,
+                    cachedAt: undefined
+                };
+                delete clearedCard.cachedAudio;
+                delete clearedCard.cachedAt;
+                
+                await saveToDB('library', clearedCard);
+                
+                // Reload the card from database to ensure we have the latest data
+                const reloadedCard = await getFromDB('library', clearedCard.cardId);
+                
+                // Update the card data and buttons
+                window.currentCardData = reloadedCard || clearedCard;
+                updateCardButtons();
+                
+                // Refresh the library view to show updated card borders
+                await loadCachedData();
+                
+                // Update storage info on main page
+                await updateStorageInfo();
+                
+            } catch (error) {
+                console.error('Error clearing card data:', error);
+                alert('Failed to clear card data: ' + error.message);
+            }
+        }
+        
+        function updateCardButtons() {
+            const cardData = window.currentCardData;
+            const saveBtn = document.getElementById('saveCardBtn');
+            const clearBtn = document.getElementById('clearCardBtn');
+            const sizeSpan = document.getElementById('cardDataSize');
+            
+            console.log('[updateCardButtons] cardData:', cardData ? 'EXISTS' : 'NULL');
+            if (cardData) {
+                console.log('[updateCardButtons] cardData.cardId:', cardData.cardId);
+                console.log('[updateCardButtons] cardData.cachedAudio:', cardData.cachedAudio);
+                if (cardData.cachedAudio) {
+                    console.log('[updateCardButtons] cachedAudio keys:', Object.keys(cardData.cachedAudio));
+                }
+            }
+            
+            if (!cardData) {
+                saveBtn.style.display = 'none';
+                clearBtn.style.display = 'none';
+                return;
+            }
+            
+            const hasCache = cardData.cachedAudio && Object.keys(cardData.cachedAudio).length > 0;
+            console.log('[updateCardButtons] hasCache:', hasCache);
+            
+            if (hasCache) {
+                console.log('[updateCardButtons] Showing CLEAR button');
+                saveBtn.style.display = 'none';
+                clearBtn.style.display = 'inline-block';
+                
+                // Calculate total size
+                let totalSize = 0;
+                for (const key in cardData.cachedAudio) {
+                    totalSize += cardData.cachedAudio[key].size || 0;
+                }
+                const sizeMB = (totalSize / (1024 * 1024)).toFixed(1);
+                sizeSpan.textContent = `${sizeMB} MB`;
+            } else {
+                console.log('[updateCardButtons] Showing SAVE button');
+                saveBtn.style.display = 'inline-block';
+                clearBtn.style.display = 'none';
+            }
+        }
+        
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+        
+        async function updateStorageInfo() {
+            try {
+                // Ensure DB is initialized first
+                if (!db) {
+                    await initDB();
+                }
+                
+                // Calculate total cached audio size
+                const library = await getAllFromDB('library');
+                let totalCachedSize = 0;
+                let cachedCardsCount = 0;
+                
+                if (library && Array.isArray(library)) {
+                    for (const card of library) {
+                        if (card.cachedAudio && Object.keys(card.cachedAudio).length > 0) {
+                            cachedCardsCount++;
+                            for (const key in card.cachedAudio) {
+                                totalCachedSize += card.cachedAudio[key].size || 0;
+                            }
+                        }
+                    }
+                }
+                
+                const cachedMB = (totalCachedSize / (1024 * 1024)).toFixed(1);
+                const cachedSizeSpan = document.getElementById('cachedSize');
+                if (cachedSizeSpan) {
+                    if (cachedCardsCount > 0) {
+                        cachedSizeSpan.textContent = `${cachedMB} MB (${cachedCardsCount} cards)`;
+                    } else {
+                        cachedSizeSpan.textContent = 'None';
+                    }
+                }
+                
+                // Get storage quota using StorageManager API
+                if (navigator.storage && navigator.storage.estimate) {
+                    const estimate = await navigator.storage.estimate();
+                    const usedMB = estimate.usage / (1024 * 1024);
+                    const quotaMB = estimate.quota / (1024 * 1024);
+                    const usagePercent = ((estimate.usage / estimate.quota) * 100).toFixed(1);
+                    
+                    // Format sizes (use GB if over 1000 MB)
+                    let usedStr, quotaStr;
+                    if (usedMB > 1000) {
+                        usedStr = (usedMB / 1024).toFixed(1) + ' GB';
+                    } else {
+                        usedStr = usedMB.toFixed(1) + ' MB';
+                    }
+                    if (quotaMB > 1000) {
+                        quotaStr = (quotaMB / 1024).toFixed(1) + ' GB';
+                    } else {
+                        quotaStr = quotaMB.toFixed(0) + ' MB';
+                    }
+                    
+                    const storageQuotaSpan = document.getElementById('storageQuota');
+                    if (storageQuotaSpan) {
+                        storageQuotaSpan.textContent = `${usedStr} / ${quotaStr} (${usagePercent}%)`;
+                    }
+                    
+                    const storageBar = document.getElementById('storageBar');
+                    if (storageBar) {
+                        storageBar.style.width = `${usagePercent}%`;
+                    }
+                } else {
+                    const storageQuotaSpan = document.getElementById('storageQuota');
+                    if (storageQuotaSpan) {
+                        storageQuotaSpan.textContent = 'Not available';
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error calculating storage info:', error);
+                console.error('Error stack:', error.stack);
+                const cachedSizeSpan = document.getElementById('cachedSize');
+                const storageQuotaSpan = document.getElementById('storageQuota');
+                if (cachedSizeSpan) cachedSizeSpan.textContent = 'Error';
+                if (storageQuotaSpan) storageQuotaSpan.textContent = 'Error';
+            }
+        }
+        
+        async function getAllFromDB(storeName) {
+            try {
+                if (!db) {
+                    await initDB();
+                }
+                return new Promise((resolve, reject) => {
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        console.log(`Store '${storeName}' does not exist yet`);
+                        resolve([]);
+                        return;
+                    }
+                    const transaction = db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.getAll();
+                    request.onsuccess = () => resolve(request.result || []);
+                    request.onerror = () => {
+                        console.error(`Error reading from store '${storeName}':`, request.error);
+                        reject(request.error);
+                    };
+                });
+            } catch (error) {
+                console.error(`Error in getAllFromDB for store '${storeName}':`, error);
+                return [];
+            }
+        }
+
+        // Audio Player Object
+        const audioPlayer = {
+            audio: null,
+            currentCardId: null,
+            currentChapterIndex: null,
+            cardData: null,
+            isPlaying: false,
+            currentPlayPromise: null, // Track the current play promise
+            
+            init() {
+                this.audio = document.getElementById('audioElement');
+                
+                // Event listeners
+                this.audio.addEventListener('timeupdate', () => this.onTimeUpdate());
+                this.audio.addEventListener('ended', () => this.onEnded());
+                this.audio.addEventListener('play', () => this.onPlay());
+                this.audio.addEventListener('pause', () => this.onPause());
+                this.audio.addEventListener('loadstart', () => console.log('Audio loading...'));
+                this.audio.addEventListener('canplay', () => console.log('Audio can play'));
+                this.audio.addEventListener('error', (e) => {
+                    console.error('Audio error:', e);
+                    alert('Failed to load audio. Please try again.');
+                });
+            },
+            
+            async playChapter(cardId, chapterIndex) {
+                try {
+                    // If there's a play promise in progress, wait for it to settle
+                    if (this.currentPlayPromise) {
+                        try {
+                            await this.currentPlayPromise;
+                        } catch (e) {
+                            // Ignore errors from interrupted play
+                            console.log('Previous play interrupted:', e.message);
+                        }
+                    }
+                    
+                    // Pause current playback before switching
+                    this.audio.pause();
+                    
+                    // Get card data
+                    if (!window.currentCardData || window.currentCardData.cardId !== cardId) {
+                        // Load from IndexedDB if not in memory
+                        if (!db) await initDB();
+                        const card = await new Promise((resolve, reject) => {
+                            const transaction = db.transaction(['library'], 'readonly');
+                            const store = transaction.objectStore('library');
+                            const request = store.get(cardId);
+                            request.onsuccess = () => resolve(request.result);
+                            request.onerror = () => reject(request.error);
+                        });
+                        if (!card) {
+                            alert('Card not found');
+                            return;
+                        }
+                        this.cardData = card;
+                    } else {
+                        this.cardData = window.currentCardData;
+                    }
+                    
+                    const chapter = this.cardData.content?.chapters?.[chapterIndex];
+                    if (!chapter) {
+                        alert('Chapter not found');
+                        return;
+                    }
+                    
+                    this.currentCardId = cardId;
+                    this.currentChapterIndex = chapterIndex;
+                    
+                    // Check if audio is cached locally
+                    let audioUrl = null;
+                    if (this.cardData.cachedAudio && this.cardData.cachedAudio[chapterIndex]) {
+                        console.log('Using cached audio');
+                        audioUrl = this.cardData.cachedAudio[chapterIndex].data;
+                    } else {
+                        // Check if we're in offline mode
+                        if (!await isOnlineMode()) {
+                            showOfflineWarning('<i class="fa-solid fa-triangle-exclamation"></i> Cannot play online audio in offline mode. Please cache the audio first.');
+                            return;
+                        }
+                        
+                        // Fetch signed URL from API
+                        console.log('Fetching signed audio URL from API');
+                        const accessToken = await getFromDB('settings', 'accessToken');
+                        const refreshToken = await getFromDB('settings', 'refreshToken');
+                        const clientId = await getFromDB('settings', 'clientId');
+                        const clientSecret = await getFromDB('settings', 'clientSecret');
+                        
+                        const response = await fetch(`/api/card/${cardId}/?playable=true`, {
+                            headers: {
+                                'X-Access-Token': accessToken,
+                                'X-Refresh-Token': refreshToken,
+                                'X-Client-Id': clientId,
+                                'X-Client-Secret': clientSecret
+                            }
+                        });
+                        
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const result = await response.json();
+                        if (result.status === 'error') throw new Error(result.message);
+                        
+                        const playableCard = result.data.card || result.data;
+                        const playableChapter = playableCard.content?.chapters?.[chapterIndex];
+                        const track = playableChapter?.tracks?.[0];
+                        
+                        if (!track?.trackUrl) {
+                            alert('Audio URL not found');
+                            return;
+                        }
+                        audioUrl = track.trackUrl;
+                    }
+                    
+                    // Load and play
+                    this.audio.src = audioUrl;
+                    
+                    // Track the play promise
+                    this.currentPlayPromise = this.audio.play();
+                    await this.currentPlayPromise;
+                    this.currentPlayPromise = null;
+                    
+                    // Update UI
+                    this.updateNowPlaying();
+                    this.updateChapterHighlight();
+                    
+                } catch (error) {
+                    this.currentPlayPromise = null;
+                    console.error('Error playing chapter:', error);
+                    // Only show alert for non-abort errors
+                    if (error.name !== 'AbortError' && !error.message.includes('interrupted')) {
+                        alert('Failed to play audio: ' + error.message);
+                    }
+                }
+            },
+            
+            togglePlayPause() {
+                if (this.audio.paused) {
+                    this.audio.play();
+                } else {
+                    this.audio.pause();
+                }
+            },
+            
+            pause() {
+                this.audio.pause();
+            },
+            
+            stop() {
+                this.audio.pause();
+                this.audio.currentTime = 0;
+                this.currentCardId = null;
+                this.currentChapterIndex = null;
+                this.cardData = null;
+                this.hideNowPlaying();
+                this.clearChapterHighlight();
+            },
+            
+            previous() {
+                if (this.currentChapterIndex > 0) {
+                    this.playChapter(this.currentCardId, this.currentChapterIndex - 1);
+                }
+            },
+            
+            next() {
+                const totalChapters = this.cardData?.content?.chapters?.length || 0;
+                if (this.currentChapterIndex < totalChapters - 1) {
+                    this.playChapter(this.currentCardId, this.currentChapterIndex + 1);
+                }
+            },
+            
+            onTimeUpdate() {
+                if (!this.currentCardId || this.currentChapterIndex === null) return;
+                
+                const currentTime = this.audio.currentTime;
+                const duration = this.audio.duration;
+                const progress = (currentTime / duration) * 100;
+                
+                // Update progress bar in chapter item
+                const progressBar = document.getElementById(`progress-${this.currentCardId}-${this.currentChapterIndex}`);
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+                
+                // Update progress bar in now playing bar
+                const nowPlayingProgressBar = document.getElementById('nowPlayingProgressBar');
+                if (nowPlayingProgressBar) {
+                    nowPlayingProgressBar.style.width = `${progress}%`;
+                }
+            },
+            
+            onEnded() {
+                // Auto-play next track
+                this.next();
+            },
+            
+            onPlay() {
+                this.isPlaying = true;
+                const playPauseBtn = document.getElementById('nowPlayingPlayPause');
+                if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            },
+            
+            onPause() {
+                this.isPlaying = false;
+                const playPauseBtn = document.getElementById('nowPlayingPlayPause');
+                if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+            },
+            
+            async updateNowPlaying() {
+                const chapter = this.cardData?.content?.chapters?.[this.currentChapterIndex];
+                if (!chapter) return;
+                
+                const bar = document.getElementById('nowPlayingBar');
+                const image = document.getElementById('nowPlayingImage');
+                const trackIcon = document.getElementById('nowPlayingTrackIcon');
+                const title = document.getElementById('nowPlayingTitle');
+                const subtitle = document.getElementById('nowPlayingSubtitle');
+                
+                if (bar) bar.classList.add('active');
+                if (image) image.src = this.cardData.metadata?.cover?.imageL || '';
+                if (title) title.textContent = chapter.title || `Track ${this.currentChapterIndex + 1}`;
+                if (subtitle) subtitle.textContent = this.cardData.title || 'Unknown Card';
+                
+                // Load track icon from cache
+                if (trackIcon) {
+                    const iconUrl = chapter.display?.icon16x16;
+                    if (iconUrl) {
+                        const cached = await getCachedImage(iconUrl);
+                        trackIcon.src = cached || iconUrl;
+                        trackIcon.style.display = 'block';
+                    } else {
+                        trackIcon.style.display = 'none';
+                    }
+                }
+            },
+            
+            hideNowPlaying() {
+                const bar = document.getElementById('nowPlayingBar');
+                if (bar) bar.classList.remove('active');
+            },
+            
+            updateChapterHighlight() {
+                // Remove previous highlights
+                this.clearChapterHighlight();
+                
+                // Add current highlight
+                const chapterItem = document.getElementById(`chapter-${this.currentCardId}-${this.currentChapterIndex}`);
+                if (chapterItem) {
+                    chapterItem.classList.add('playing');
+                }
+            },
+            
+            clearChapterHighlight() {
+                const allChapters = document.querySelectorAll('.chapter-item.playing');
+                allChapters.forEach(item => item.classList.remove('playing'));
+            }
+        };
+        
+        // Initialize audio player on load
+        audioPlayer.init();
+        
+        // Function to open the card modal from now playing bar
+        function openNowPlayingCard() {
+            if (audioPlayer.currentCardId && audioPlayer.cardData) {
+                openDetailModal(audioPlayer.cardData);
+            }
+        }
+        
+        // Keep old playChapter for compatibility (delegates to audioPlayer)
+        function playChapter(cardId, chapterIndex, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            audioPlayer.playChapter(cardId, chapterIndex);
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('detailModal');
+            if (e.target === modal) {
+                closeDetailModal();
+            }
+        });
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = '⚠️ ' + message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.className = 'success-message';
+            errorEl.textContent = '✓ ' + message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+                errorEl.className = 'error';
+            }, 3000);
+        }
+
+        async function loadCachedData() {
+            const container = document.getElementById('libraryContainer');
+            try {
+                // Ensure DB is initialized
+                if (!db) {
+                    console.log('loadCachedData: DB not initialized, initializing...');
+                    await initDB();
+                }
+                
+                // Update online status BEFORE rendering
+                await updateOnlineStatus();
+                
+                // Load cached library
+                const cachedLibrary = await getAllFromDB('library');
+                
+                // Get and display access token for debugging
+                const accessToken = await getFromDB('settings', 'accessToken');
+                if (accessToken) {
+                    // console.log('='.repeat(60));
+                    // console.log('ACCESS TOKEN (copy this):');
+                    // console.log(accessToken);
+                    // console.log('='.repeat(60));
+                }
+                
+                if (cachedLibrary && cachedLibrary.length > 0) {
+                    console.log(`Loaded ${cachedLibrary.length} items from cache`);
+                    
+                    renderLibrary(cachedLibrary);
+                } else {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="fa-solid fa-book"></i></div>
+                            <p>No cached library data</p>
+                            <p style="font-size: 14px; margin-top: 10px;">Click "Load from Yoto" to load your library</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading cached data:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fa-solid fa-book"></i></div>
+                        <p>No library data available</p>
+                        <p style="font-size: 14px; margin-top: 10px;">Click "Load from Yoto" to load your library</p>
+                    </div>
+                `;
+            }
+        }
+
+        function openAdvancedOptions(event) {
+            event.preventDefault();
+            const modal = document.getElementById('advancedModal');
+            modal.classList.add('active');
+            // Update storage info when opening
+            updateStorageInfo();
+        }
+
+        function closeAdvancedOptions() {
+            const modal = document.getElementById('advancedModal');
+            modal.classList.remove('active');
+            // Reset the form when closing
+            document.getElementById('deleteConfirm').value = '';
+            document.getElementById('clearDataBtn').disabled = true;
+            document.getElementById('clearDataBtn').style.background = '#999';
+            document.getElementById('clearDataBtn').style.borderColor = '#999';
+            document.getElementById('clearDataBtn').style.cursor = 'not-allowed';
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('advancedModal');
+            if (event.target === modal) {
+                closeAdvancedOptions();
+            }
+        });
+
+        // Listen for input on delete confirmation
+        document.addEventListener('DOMContentLoaded', function() {
+            const deleteConfirm = document.getElementById('deleteConfirm');
+            const clearDataBtn = document.getElementById('clearDataBtn');
+            
+            if (deleteConfirm && clearDataBtn) {
+                deleteConfirm.addEventListener('input', function() {
+                    if (this.value.toLowerCase() === 'delete') {
+                        clearDataBtn.disabled = false;
+                        clearDataBtn.style.background = '#dc3545';
+                        clearDataBtn.style.borderColor = '#dc3545';
+                        clearDataBtn.style.cursor = 'pointer';
+                    } else {
+                        clearDataBtn.disabled = true;
+                        clearDataBtn.style.background = '#999';
+                        clearDataBtn.style.borderColor = '#999';
+                        clearDataBtn.style.cursor = 'not-allowed';
+                    }
+                });
+            }
+        });
+
+        async function clearAllData() {
+            if (!confirm('Are you sure you want to sign out and clear ALL data? This will delete all cached cards, audio, settings, and sign you out. This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                // Close the database connection
+                if (db) {
+                    db.close();
+                    db = null;
+                }
+                
+                // Clear localStorage (OAuth tokens)
+                localStorage.clear();
+                console.log('localStorage cleared');
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+                console.log('sessionStorage cleared');
+                
+                // Delete the entire database
+                const deleteRequest = indexedDB.deleteDatabase('YotoLocalDB');
+                
+                deleteRequest.onsuccess = async function() {
+                    console.log('Database deleted successfully');
+                    
+                    // Reinitialize the database
+                    await initDB();
+                    console.log('Database reinitialized');
+                    
+                    alert('All data cleared and signed out successfully! Redirecting to setup...');
+                    
+                    // Redirect to setup page
+                    window.location.href = '/setup';
+                };
+                
+                deleteRequest.onerror = function(event) {
+                    console.error('Error deleting database:', event);
+                    alert('Error clearing data. Please try again.');
+                };
+                
+                deleteRequest.onblocked = function() {
+                    console.warn('Database deletion blocked');
+                    alert('Unable to clear data. Please close all other tabs with this app open and try again.');
+                };
+                
+            } catch (error) {
+                console.error('Error clearing data:', error);
+                alert('Error clearing data: ' + error.message);
+            }
+        }
+
+        async function fetchFromYoto() {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '🔄 Fetching...';
+            
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('libraryContainer').innerHTML = '<div class="loading"><div class="spinner"></div><p>Fetching from Yoto...</p></div>';
+            
+            try {
+                const library = await fetchLibrary();
+                
+                renderLibrary(library);
+                showSuccess(`Loaded ${library.length} items from Yoto`);
+            } catch (error) {
+                console.error('Error fetching from Yoto:', error);
+                // Don't show error toast - offline warning modal already displayed
+                // Show cached data if fetch failed
+                await loadCachedData();
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Load from Yoto';
+                document.getElementById('progressContainer').style.display = 'none';
+            }
+        }
+        
+        function updateProgress(current, total, message) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            if (progressBar && progressText) {
+                const percentage = total > 0 ? (current / total) * 100 : 0;
+                progressBar.style.width = percentage + '%';
+                progressText.textContent = message || `${current}/${total}`;
+            }
+        }
+
+        async function loadData() {
+            // Just load cached data initially
+            await loadCachedData();
+            // Update storage info
+            await updateStorageInfo();
+        }
+
+        async function refreshData() {
+            await fetchFromYoto();
+        }
+
+        async function checkSetup() {
+            console.log('checkSetup: Starting');
+            
+            try {
+                // Ensure DB is initialized
+                if (!db) {
+                    console.log('checkSetup: DB not initialized, initializing...');
+                    await initDB();
+                }
+                
+                // Check if server is using env credentials (from injected config)
+                const usingEnvCredentials = window.SERVER_CONFIG?.useEnvCredentials || false;
+                if (usingEnvCredentials) {
+                    console.log('Server is using environment credentials');
+                }
+                
+                // Check for refresh token in IndexedDB
+                console.log('checkSetup: Checking for refresh token...');
+                const refreshToken = await getFromDB('settings', 'refreshToken');
+                
+                console.log('checkSetup: refreshToken =', refreshToken ? 'FOUND' : 'NOT FOUND');
+                if (!refreshToken) {
+                    console.log('No refresh token found - redirecting to setup');
+                    window.location.href = '/setup/';
+                    return;
+                } else {
+                    console.log('Refresh token exists, continuing to app');
+                }
+            } catch (error) {
+                console.error('checkSetup error:', error);
+                // On error, redirect to setup to be safe
+                window.location.href = '/setup/';
+            }
+        }
+
+        // Online/Offline Mode Management
+        async function toggleOnlineMode() {
+            const currentMode = await getFromDB('settings', 'onlineMode');
+            const newMode = currentMode === false ? true : false;
+            
+            await saveToDB('settings', { key: 'onlineMode', value: newMode });
+            await saveToDB('settings', { key: 'manualOverride', value: true });
+            updateOnlineStatus();
+            
+            // Re-render library to update card borders
+            await loadCachedData();
+            
+            if (newMode) {
+                console.log('Switched to ONLINE mode (manual override)');
+            } else {
+                console.log('Switched to OFFLINE mode (manual override)');
+            }
+        }
+        
+        async function updateOnlineStatus() {
+            // Check if there's a manual override
+            const manualOverride = await getFromDB('settings', 'manualOverride');
+            let mode;
+            
+            if (manualOverride === true) {
+                // Use the manually set mode
+                const isOnline = await getFromDB('settings', 'onlineMode');
+                mode = isOnline !== false;
+                console.log('[STATUS] Using manual mode:', mode ? 'ONLINE' : 'OFFLINE');
+            } else {
+                // Use browser's network detection
+                mode = navigator.onLine;
+                console.log('[STATUS] Auto-detected mode:', mode ? 'ONLINE' : 'OFFLINE');
+                // Update the DB to reflect current state
+                await saveToDB('settings', { key: 'onlineMode', value: mode });
+            }
+            
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+            
+            if (statusIcon && statusText) {
+                if (mode) {
+                    statusIcon.style.color = '#4caf50';
+                    statusText.textContent = manualOverride ? 'Online (Manual)' : 'Online';
+                } else {
+                    statusIcon.style.color = '#f44336';
+                    statusText.textContent = manualOverride ? 'Offline (Manual)' : 'Offline';
+                }
+            }
+            
+            // Store globally for access by other functions
+            window.onlineModeValue = mode;
+        }
+        
+        // Setup automatic network detection
+        function setupNetworkDetection() {
+            window.addEventListener('online', async () => {
+                console.log('[NETWORK] Browser detected connection restored');
+                const manualOverride = await getFromDB('settings', 'manualOverride');
+                if (!manualOverride) {
+                    await saveToDB('settings', { key: 'onlineMode', value: true });
+                    await updateOnlineStatus();
+                    await loadCachedData();
+                }
+            });
+            
+            window.addEventListener('offline', async () => {
+                console.log('[NETWORK] Browser detected connection lost');
+                const manualOverride = await getFromDB('settings', 'manualOverride');
+                if (!manualOverride) {
+                    await saveToDB('settings', { key: 'onlineMode', value: false });
+                    await updateOnlineStatus();
+                    await loadCachedData();
+                }
+            });
+        }
+        
+        async function isOnlineMode() {
+            if (typeof window.onlineModeValue !== 'undefined') {
+                return window.onlineModeValue;
+            }
+            const mode = await getFromDB('settings', 'onlineMode');
+            return mode !== false; // Default to online
+        }
+        
+        async function updateLastRefreshDisplay() {
+            const lastRefresh = await getFromDB('settings', 'lastRefresh');
+            const displayElement = document.getElementById('lastRefreshText');
+            
+            if (!displayElement) return;
+            
+            if (!lastRefresh) {
+                displayElement.textContent = '';
+                return;
+            }
+            
+            const date = new Date(lastRefresh);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            let timeAgo;
+            if (diffMins < 1) {
+                timeAgo = 'just now';
+            } else if (diffMins < 60) {
+                timeAgo = `${diffMins}m ago`;
+            } else if (diffHours < 24) {
+                timeAgo = `${diffHours}h ago`;
+            } else if (diffDays === 1) {
+                timeAgo = 'yesterday';
+            } else {
+                timeAgo = `${diffDays}d ago`;
+            }
+            
+            displayElement.textContent = `Last refresh: ${timeAgo}`;
+            displayElement.title = date.toLocaleString();
+        }
+        
+        function showOfflineWarning(message) {
+            const warning = document.getElementById('offlineWarning');
+            const warningText = document.getElementById('offlineWarningText');
+            
+            if (warning && warningText) {
+                warningText.textContent = message || '⚠️ This feature is not available in offline mode';
+                warning.classList.add('show');
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    hideOfflineWarning();
+                }, 5000);
+            }
+        }
+        
+        function hideOfflineWarning() {
+            const warning = document.getElementById('offlineWarning');
+            if (warning) {
+                warning.classList.remove('show');
+            }
+        }
+        
+        window.addEventListener('load', async () => {
+            await initDB();
+            await checkSetup();
+            await loadData();
+            setupNetworkDetection();
+            await updateOnlineStatus();
+            await updateLastRefreshDisplay();
+            
+            // Update the relative time every minute
+            setInterval(updateLastRefreshDisplay, 60000);
+            
+            // Listen for service worker messages
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.addEventListener('message', event => {
+                    console.log('[PAGE] Message from Service Worker:', event.data);
+                    const swStatusSpan = document.getElementById('swStatus');
+                    if (event.data.type === 'SW_INSTALLING' && swStatusSpan) {
+                        swStatusSpan.textContent = `Installing ${event.data.version}...`;
+                        swStatusSpan.style.color = '#ff9800';
+                    } else if (event.data.type === 'SW_ACTIVATED' && swStatusSpan) {
+                        swStatusSpan.textContent = `Active (${event.data.version})`;
+                        swStatusSpan.style.color = '#4caf50';
+                    }
+                });
+            }
+            
+            // Register service worker for PWA
+            if ('serviceWorker' in navigator) {
+                try {
+                    // Register from root so it can control all pages
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('[PAGE] Service Worker registered:', registration);
+                    console.log('[PAGE] Service Worker scope:', registration.scope);
+                    
+                    // Update UI with service worker status
+                    const swStatusSpan = document.getElementById('swStatus');
+                    if (swStatusSpan) {
+                        if (registration.active) {
+                            swStatusSpan.textContent = 'Active';
+                            swStatusSpan.style.color = '#4caf50';
+                        } else if (registration.installing) {
+                            swStatusSpan.textContent = 'Installing...';
+                            swStatusSpan.style.color = '#ff9800';
+                        } else if (registration.waiting) {
+                            swStatusSpan.textContent = 'Waiting';
+                            swStatusSpan.style.color = '#2196f3';
+                        }
+                    }
+                    
+                    // Listen for service worker updates
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        console.log('Service Worker update found');
+                        if (swStatusSpan) {
+                            swStatusSpan.textContent = '🔄 Updating...';
+                            swStatusSpan.style.color = '#ff9800';
+                        }
+                        
+                        newWorker.addEventListener('statechange', () => {
+                            console.log('Service Worker state:', newWorker.state);
+                            if (newWorker.state === 'activated' && swStatusSpan) {
+                                swStatusSpan.textContent = 'Active (Updated)';
+                                swStatusSpan.style.color = '#4caf50';
+                            }
+                        });
+                    });
+                    
+                } catch (error) {
+                    console.error('Service Worker registration failed:', error);
+                    const swStatusSpan = document.getElementById('swStatus');
+                    if (swStatusSpan) {
+                        swStatusSpan.textContent = '❌ Failed';
+                        swStatusSpan.style.color = '#f44336';
+                    }
+                }
+            } else {
+                console.log('Service Workers not supported');
+                const swStatusSpan = document.getElementById('swStatus');
+                if (swStatusSpan) {
+                    swStatusSpan.textContent = '❌ Not Supported';
+                    swStatusSpan.style.color = '#999';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yoto Local App - Setup</title>
+    <link rel="stylesheet" href="{% static 'setup.css' %}">
+</head>
+<body>
+    <!-- Content will be loaded from static/setup.html -->
+    <script>
+        // Load the setup page
+        fetch('{% static "setup.html" %}')
+            .then(response => response.text())
+            .then(html => {
+                document.body.innerHTML = html;
+                // Re-run scripts
+                const scripts = document.querySelectorAll('script');
+                scripts.forEach(script => {
+                    const newScript = document.createElement('script');
+                    newScript.textContent = script.textContent;
+                    document.body.appendChild(newScript);
+                });
+            });
+    </script>
+</body>
+</html>
