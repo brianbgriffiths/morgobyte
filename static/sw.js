@@ -1,8 +1,9 @@
-const CACHE_NAME = 'morgobyte-v6';
+const CACHE_NAME = 'morgobyte-v0.2';
 const urlsToCache = [
   // Note: Not caching '/' because it has server-injected config that must stay fresh
+  // Note: app.html is cached but uses network-first strategy to always get latest version
   '/static/app.html',
-  '/static/setup.html',
+  '/static/setup-local.html',
   '/static/fonts/pixelfont.ttf',
   '/static/fonts/Comfortaa-Regular.ttf',
   '/static/images/logo1.png',
@@ -50,21 +51,45 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, responseToCache);
           });
-          console.log('Served from network and cached (navigate):', event.request.url);
+          console.log('[SW] Served from network and cached (navigate):', event.request.url);
           return response;
         })
         .catch(() => {
           // Network failed - try cache
-          console.log('Network failed, trying cache for:', event.request.url);
+          console.log('[SW] Network failed, trying cache for:', event.request.url);
           return caches.match(event.request).then(cachedResponse => {
             if (cachedResponse) {
-              console.log('Serving from cache (offline):', event.request.url);
+              console.log('[SW] Serving from cache (offline):', event.request.url);
               return cachedResponse;
             }
             // No cache - return error page or static app.html
-            console.log('No cache found, serving app.html');
+            console.log('[SW] No cache found, serving app.html');
             return caches.match('/static/app.html');
           });
+        })
+    );
+    return;
+  }
+
+  // For app.html specifically, ALWAYS use network-first to get latest version
+  if (event.request.url.includes('/static/app.html') || 
+      event.request.url.includes('/static/setup-local.html') ||
+      event.request.url.includes('/static/setup-server.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Cache the fresh version
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+          console.log('[SW] Served fresh app.html from network');
+          return response;
+        })
+        .catch(() => {
+          // Network failed - use cached version
+          console.log('[SW] Network failed for app.html, using cache');
+          return caches.match(event.request);
         })
     );
     return;
@@ -173,4 +198,13 @@ self.addEventListener('activate', event => {
       return self.clients.claim(); // Take control immediately
     })
   );
+});
+
+// Listen for messages from the app
+self.addEventListener('message', event => {
+  console.log('[SW] Received message:', event.data);
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] Skipping waiting...');
+    self.skipWaiting();
+  }
 });

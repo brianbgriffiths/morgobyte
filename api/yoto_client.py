@@ -111,6 +111,18 @@ class YotoAPIClient:
         try:
             response = requests.request(method, url, headers=headers, **kwargs)
             print(f"Response status: {response.status_code}")
+            
+            # If we get a 403 and we have refresh credentials, try to refresh the token and retry
+            if response.status_code == 403 and self.refresh_token and self.client_id and self.client_secret:
+                print("Got 403, attempting to refresh token and retry...")
+                if self.authenticate():
+                    print("Token refreshed successfully, retrying request...")
+                    headers['Authorization'] = f'Bearer {self.access_token}'
+                    response = requests.request(method, url, headers=headers, **kwargs)
+                    print(f"Retry response status: {response.status_code}")
+                else:
+                    print("Token refresh failed")
+            
             response.raise_for_status()
             result = response.json()
             print(f"Response JSON keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Morgobyte - Offline Yoto Player</title>
     <meta name="description" content="Offline audio card player for Yoto">
-    <meta name="theme-color" content="#FCC921">
+    <meta name="theme-color" content="#2a2a2a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -745,7 +745,7 @@
     <!-- Offline Warning Banner -->
     <div class="offline-warning" id="offlineWarning">
         <span id="offlineWarningText"><i class="fa-solid fa-triangle-exclamation"></i> This feature is not available in offline mode</span>
-        <button class="offline-warning-close" onclick="hideOfflineWarning()">×</button>
+        <button class="offline-warning-close" onclick="hideOfflineWarning()"><i class="fa-solid fa-times"></i></button>
     </div>
 
     <div class="container">
@@ -861,7 +861,7 @@
         <img class="now-playing-image" id="nowPlayingImage" onclick="openNowPlayingCard()">
         <div class="now-playing-content">
             <div class="now-playing-info" onclick="openNowPlayingCard()">
-                <img class="now-playing-track-icon" id="nowPlayingTrackIcon" alt="" style="display: none;">
+                <img class="now-playing-track-icon" id="nowPlayingTrackIcon" alt="" style="display: none; width: 48px; height: 48px; image-rendering: pixelated; image-rendering: crisp-edges;">
                 <div class="now-playing-title" id="nowPlayingTitle"></div>
                 <div class="now-playing-subtitle" id="nowPlayingSubtitle"></div>
             </div>
@@ -881,13 +881,62 @@
     <audio id="audioElement" preload="auto"></audio>
 
     <script>
+        // Service Worker Update Detection - Auto-update silently
+        let newWorker = null;
+        
+        // Register service worker and listen for updates
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(registration => {
+                    console.log('[App] Service Worker registered:', registration);
+                    
+                    // Check for updates every 60 seconds
+                    setInterval(() => {
+                        registration.update();
+                    }, 60000);
+                    
+                    // Listen for new service worker waiting
+                    registration.addEventListener('updatefound', () => {
+                        const installingWorker = registration.installing;
+                        console.log('[App] New service worker found, installing...');
+                        
+                        installingWorker.addEventListener('statechange', () => {
+                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New service worker is installed and ready - auto-activate it
+                                console.log('[App] New service worker installed, auto-activating...');
+                                newWorker = installingWorker;
+                                // Tell the new service worker to take over immediately
+                                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('[App] Service Worker registration failed:', error);
+                });
+            
+            // Listen for service worker messages
+            navigator.serviceWorker.addEventListener('message', event => {
+                console.log('[App] Message from service worker:', event.data);
+                if (event.data.type === 'SW_ACTIVATED') {
+                    console.log('[App] Service worker activated:', event.data.version);
+                }
+            });
+            
+            // When service worker controller changes, reload automatically
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('[App] Controller changed, reloading...');
+                window.location.reload();
+            });
+        }
+        
         // IndexedDB setup
         let db;
         const dbName = 'YotoLocalDB';
 
         async function initDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(dbName, 4);
+                const request = indexedDB.open(dbName, 7);
                 request.onerror = () => reject(request.error);
                 request.onsuccess = () => {
                     db = request.result;
@@ -912,10 +961,14 @@
                         console.log('Creating library store with keyPath: cardId');
                         db.createObjectStore('library', { keyPath: 'cardId' });
                     }
-                    if (!db.objectStoreNames.contains('images')) {
-                        console.log('Creating images store with keyPath: url');
-                        db.createObjectStore('images', { keyPath: 'url' });
+                    // For images store, delete and recreate to ensure correct keyPath
+                    if (db.objectStoreNames.contains('images')) {
+                        console.log('Deleting existing images store to recreate with correct keyPath');
+                        db.deleteObjectStore('images');
                     }
+                    console.log('Creating images store with keyPath: key');
+                    const imagesStore = db.createObjectStore('images', { keyPath: 'key' });
+                    imagesStore.createIndex('cardIdIndex', 'cardId');
                 };
             });
         }
@@ -1004,12 +1057,26 @@
             });
         }
 
+        async function handleApiResponse(response) {
+            // Handle API response and update tokens if refreshed
+            const result = await response.json();
+            
+            // If the server refreshed the token, update it in IndexedDB
+            if (result.newAccessToken) {
+                console.log('Access token was refreshed by server, updating...');
+                await saveToDB('settings', { key: 'accessToken', value: result.newAccessToken });
+            }
+            
+            return result;
+        }
+
         async function cacheImage(url) {
             if (!url) return null;
             
             try {
+                const key = getImageKey(url);
                 // Check if already cached
-                const cached = await getFromDB('images', url);
+                const cached = await getFromDB('images', key);
                 if (cached) {
                     console.log('Image already cached:', url);
                     return cached;
@@ -1018,11 +1085,13 @@
                 // Download and cache
                 console.log('Downloading image:', url);
                 const response = await fetch(url);
+                const contentType = response.headers.get('content-type') || 'image/jpeg';
                 const blob = await response.blob();
-                const dataUrl = await blobToDataUrl(blob);
+                const blobWithType = new Blob([blob], { type: contentType });
+                const dataUrl = await blobToDataUrl(blobWithType);
                 
                 // Save to IndexedDB
-                await saveToDB('images', { url: url, data: dataUrl, cachedAt: new Date().toISOString() });
+                await saveToDB('images', { key: key, cardId: cardId, data: dataUrl, cachedAt: new Date().toISOString() });
                 console.log('Image cached:', url);
                 return dataUrl;
             } catch (error) {
@@ -1031,17 +1100,64 @@
             }
         }
         
-        async function getCachedImage(url) {
-            if (!url) return null;
-            try {
-                const cached = await getFromDB('images', url);
-                return cached || null;
-            } catch (error) {
-                console.error('Failed to get cached image:', url, error);
-                return null;
-            }
+        async function getImageHashesForCard(cardId) {
+            return new Promise(async (resolve, reject) => {
+                if (!db) {
+                    console.warn('getImageHashesForCard: db is not initialized');
+                    resolve([]);
+                    return;
+                }
+                if (!db.objectStoreNames.contains('images')) {
+                    console.log('Images store does not exist');
+                    resolve([]);
+                    return;
+                }
+                const transaction = db.transaction(['images'], 'readonly');
+                const store = transaction.objectStore('images');
+                const index = store.index('cardIdIndex');
+                const request = index.getAll(cardId);
+                request.onsuccess = () => {
+                    const hashes = request.result.map(item => item.key);
+                    resolve(hashes);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function deleteImage(hash) {
+            return new Promise(async (resolve, reject) => {
+                if (!db) {
+                    console.warn('deleteImage: db is not initialized');
+                    resolve();
+                    return;
+                }
+                if (!db.objectStoreNames.contains('images')) {
+                    console.log('Images store does not exist');
+                    resolve();
+                    return;
+                }
+                const transaction = db.transaction(['images'], 'readwrite');
+                const store = transaction.objectStore('images');
+                const request = store.delete(hash);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
         }
         
+        function getImageKey(url) {
+            // For Yoto card images, use the hash after ~/ to save space
+            if (url.includes('card-content.yotoplay.com')) {
+                const afterTilde = url.split('~/')[1];
+                if (afterTilde.startsWith('pub/')) {
+                    return afterTilde.split('/')[1]; // hash after pub/
+                } else {
+                    return afterTilde; // direct hash
+                }
+            }
+            // For other images, use the full URL
+            return url;
+        }
+
         function blobToDataUrl(blob) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -1049,6 +1165,37 @@
                 reader.onerror = reject;
                 reader.readAsDataURL(blob);
             });
+        }
+
+        async function getCachedImage(url, cardId) {
+            if (!url) return null;
+            try {
+                const key = getImageKey(url);
+                let cached = await getFromDB('images', key);
+                if (cached) {
+                    return cached.data;
+                }
+                // Not cached, try to fetch and cache now
+                console.log('Image not cached, fetching:', url);
+                
+                if (!url.includes('card-content.yotoplay.com')) {
+                    // For public images, don't cache due to CORS
+                    console.log('Skipping cache for public image:', url);
+                    return null;
+                }
+                
+                const response = await fetch(url);
+                const contentType = response.headers.get('content-type') || 'image/jpeg';
+                const blob = await response.blob();
+                const blobWithType = new Blob([blob], { type: contentType });
+                const dataUrl = await blobToDataUrl(blobWithType);
+                await saveToDB('images', { key: key, cardId: cardId, data: dataUrl, cachedAt: new Date().toISOString() });
+                console.log('Image cached on demand:', url);
+                return dataUrl;
+            } catch (error) {
+                console.error('Failed to get or cache image:', url, error);
+                return null;
+            }
         }
 
         async function clearStore(storeName) {
@@ -1148,11 +1295,16 @@
                                     metadata: cardDetails.metadata || item.metadata
                                 };
                                 
+                                // Collect new image hashes for this card
+                                const newHashes = [];
+                                
                                 // Cache the card image
                                 const cover = fullItem.metadata?.cover || {};
                                 const imageUrl = cover.imageL || cover.imageM || cover.imageS;
                                 if (imageUrl) {
-                                    await cacheImage(imageUrl);
+                                    const hash = getImageKey(imageUrl);
+                                    newHashes.push(hash);
+                                    await cacheImage(imageUrl, item.cardId);
                                 }
                                 
                                 // Cache track icons
@@ -1160,7 +1312,17 @@
                                 for (const chapter of chapters) {
                                     const iconUrl = chapter.display?.icon16x16;
                                     if (iconUrl) {
-                                        await cacheImage(iconUrl);
+                                        const hash = getImageKey(iconUrl);
+                                        newHashes.push(hash);
+                                        await cacheImage(iconUrl, item.cardId);
+                                    }
+                                }
+                                
+                                // Clean up old images for this card
+                                const oldHashes = await getImageHashesForCard(item.cardId);
+                                for (const oldHash of oldHashes) {
+                                    if (!newHashes.includes(oldHash)) {
+                                        await deleteImage(oldHash);
                                     }
                                 }
                                 
@@ -1237,13 +1399,47 @@
                 item.innerHTML = `
                     <h3>${player.name || 'Unnamed Player'}</h3>
                     <p>ID: ${player.id || 'N/A'}</p>
-                    <p>Status: ${player.online ? '🟢 Online' : '⚫ Offline'}</p>
+                    <p>Status: ${player.online ? '<i class="fa-solid fa-circle" style="color: green;"></i> Online' : '<i class="fa-solid fa-circle" style="color: gray;"></i> Offline'}</p>
                 `;
                 grid.appendChild(item);
             });
             
             container.innerHTML = '';
             container.appendChild(grid);
+        }
+
+        // Intersection Observer for lazy loading images
+        let imageObserver = null;
+        
+        function setupImageObserver() {
+            if (imageObserver) {
+                imageObserver.disconnect();
+            }
+            
+            imageObserver = new IntersectionObserver((entries) => {
+                entries.forEach(async (entry) => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        const imageUrl = img.getAttribute('data-lazy-src');
+                        const cardId = img.getAttribute('data-card-id');
+                        
+                        if (imageUrl) {
+                            // Try to load from cache
+                            const cached = await getCachedImage(imageUrl, cardId);
+                            if (cached) {
+                                img.src = cached;
+                            } else {
+                                // Use original URL if not cached
+                                img.src = imageUrl;
+                            }
+                            img.removeAttribute('data-lazy-src');
+                            imageObserver.unobserve(img);
+                        }
+                    }
+                });
+            }, {
+                rootMargin: '50px' // Start loading images 50px before they enter viewport
+            });
         }
 
         async function renderLibrary(items) {
@@ -1262,6 +1458,9 @@
 
             const grid = document.createElement('div');
             grid.className = 'grid';
+            
+            // Setup lazy loading observer
+            setupImageObserver();
             
             for (const item of items) {
                 const card = document.createElement('div');
@@ -1283,28 +1482,31 @@
                 const title = item.title || item.metadata?.title || item.name || 'Untitled';
                 const author = item.metadata?.author || item.author || '';
                 
-                // Get image URL and check cache
+                // Get image URL - DON'T load from cache yet, just store the URL
                 const cover = metadata.cover || {};
                 const imageUrl = cover.imageL || cover.imageM || cover.imageS || null;
                 
-                // Try to get cached image
-                let imageSrc = imageUrl;
-                if (imageUrl) {
-                    const cached = await getCachedImage(imageUrl);
-                    if (cached) {
-                        imageSrc = cached;  // cached is the data URL
-                    }
-                }
+                // Use a placeholder and lazy load the actual image
+                const imageHtml = imageUrl 
+                    ? `<img data-lazy-src="${imageUrl}" data-card-id="${item.cardId}" alt="${title}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-music&quot;&gt;&lt;/i&gt;'" style="background: #333;">`
+                    : '<i class="fa-solid fa-music"></i>';
                 
                 card.innerHTML = `
                     <div class="library-card-image">
-                        ${imageSrc ? `<img src="${imageSrc}" alt="${title}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-music&quot;&gt;&lt;/i&gt;'" data-original-url="${imageUrl || ''}">` : '<i class="fa-solid fa-music"></i>'}
+                        ${imageHtml}
                     </div>
                     <div class="library-card-content">
                         <div class="library-card-title">${title}</div>
                         ${author ? `<div class="library-card-meta">${author}</div>` : ''}
                     </div>
                 `;
+                
+                // Observe the image for lazy loading
+                const img = card.querySelector('img[data-lazy-src]');
+                if (img && imageObserver) {
+                    imageObserver.observe(img);
+                }
+                
                 grid.appendChild(card);
             }
             
@@ -1440,7 +1642,7 @@
                 const iconPromises = chapters.map(async (chapter) => {
                     const iconUrl = chapter.display?.icon16x16;
                     if (iconUrl) {
-                        const cached = await getCachedImage(iconUrl);
+                        const cached = await getCachedImage(iconUrl, item.cardId);
                         return cached || iconUrl;
                     }
                     return null;
@@ -1536,7 +1738,7 @@
                 });
                 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const result = await response.json();
+                const result = await handleApiResponse(response);
                 if (result.status === 'error') throw new Error(result.message);
                 
                 const playableCard = result.data.card || result.data;
@@ -1603,7 +1805,7 @@
                 alert('Failed to save card: ' + error.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '💾 Save Card Locally';
+                btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Card Locally';
             }
         }
         
@@ -1904,7 +2106,7 @@
                         });
                         
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                        const result = await response.json();
+                        const result = await handleApiResponse(response);
                         if (result.status === 'error') throw new Error(result.message);
                         
                         const playableCard = result.data.card || result.data;
@@ -2031,7 +2233,7 @@
                 if (trackIcon) {
                     const iconUrl = chapter.display?.icon16x16;
                     if (iconUrl) {
-                        const cached = await getCachedImage(iconUrl);
+                        const cached = await getCachedImage(iconUrl, this.cardData.cardId);
                         trackIcon.src = cached || iconUrl;
                         trackIcon.style.display = 'block';
                     } else {
@@ -2090,7 +2292,7 @@
 
         function showError(message) {
             const errorEl = document.getElementById('errorMessage');
-            errorEl.textContent = '⚠️ ' + message;
+            errorEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + message;
             errorEl.style.display = 'block';
             setTimeout(() => {
                 errorEl.style.display = 'none';
@@ -2261,7 +2463,7 @@
         async function fetchFromYoto() {
             const btn = document.getElementById('refreshBtn');
             btn.disabled = true;
-            btn.textContent = '🔄 Fetching...';
+            btn.innerHTML = '<i class="fa-solid fa-download"></i> Loading Card Data...';
             
             document.getElementById('progressContainer').style.display = 'block';
             document.getElementById('libraryContainer').innerHTML = '<div class="loading"><div class="spinner"></div><p>Fetching from Yoto...</p></div>';
@@ -2465,7 +2667,7 @@
             const warningText = document.getElementById('offlineWarningText');
             
             if (warning && warningText) {
-                warningText.textContent = message || '⚠️ This feature is not available in offline mode';
+                warningText.innerHTML = message || '<i class="fa-solid fa-triangle-exclamation"></i> This feature is not available in offline mode';
                 warning.classList.add('show');
                 
                 // Auto-hide after 5 seconds
@@ -2508,62 +2710,11 @@
                 });
             }
             
-            // Register service worker for PWA
-            if ('serviceWorker' in navigator) {
-                try {
-                    // Register from root so it can control all pages
-                    const registration = await navigator.serviceWorker.register('/sw.js');
-                    console.log('[PAGE] Service Worker registered:', registration);
-                    console.log('[PAGE] Service Worker scope:', registration.scope);
-                    
-                    // Update UI with service worker status
-                    const swStatusSpan = document.getElementById('swStatus');
-                    if (swStatusSpan) {
-                        if (registration.active) {
-                            swStatusSpan.textContent = 'Active';
-                            swStatusSpan.style.color = '#4caf50';
-                        } else if (registration.installing) {
-                            swStatusSpan.textContent = 'Installing...';
-                            swStatusSpan.style.color = '#ff9800';
-                        } else if (registration.waiting) {
-                            swStatusSpan.textContent = 'Waiting';
-                            swStatusSpan.style.color = '#2196f3';
-                        }
-                    }
-                    
-                    // Listen for service worker updates
-                    registration.addEventListener('updatefound', () => {
-                        const newWorker = registration.installing;
-                        console.log('Service Worker update found');
-                        if (swStatusSpan) {
-                            swStatusSpan.textContent = '🔄 Updating...';
-                            swStatusSpan.style.color = '#ff9800';
-                        }
-                        
-                        newWorker.addEventListener('statechange', () => {
-                            console.log('Service Worker state:', newWorker.state);
-                            if (newWorker.state === 'activated' && swStatusSpan) {
-                                swStatusSpan.textContent = 'Active (Updated)';
-                                swStatusSpan.style.color = '#4caf50';
-                            }
-                        });
-                    });
-                    
-                } catch (error) {
-                    console.error('Service Worker registration failed:', error);
-                    const swStatusSpan = document.getElementById('swStatus');
-                    if (swStatusSpan) {
-                        swStatusSpan.textContent = '❌ Failed';
-                        swStatusSpan.style.color = '#f44336';
-                    }
-                }
-            } else {
-                console.log('Service Workers not supported');
-                const swStatusSpan = document.getElementById('swStatus');
-                if (swStatusSpan) {
-                    swStatusSpan.textContent = '❌ Not Supported';
-                    swStatusSpan.style.color = '#999';
-                }
+            // Update service worker status in UI
+            const swStatusSpan = document.getElementById('swStatus');
+            if (swStatusSpan && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                swStatusSpan.textContent = 'Active (v0.2)';
+                swStatusSpan.style.color = '#4caf50';
             }
         });
     </script>

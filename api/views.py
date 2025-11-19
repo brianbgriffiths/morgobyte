@@ -55,6 +55,20 @@ def get_client_from_request(request):
     return client
 
 
+def create_response_with_tokens(client, data, status='success'):
+    """Create a JSON response that includes updated tokens if they changed."""
+    response_data = {
+        'status': status,
+        'data': data
+    }
+    
+    # If the client has new tokens (from a refresh), include them in the response
+    if client.access_token:
+        response_data['newAccessToken'] = client.access_token
+    
+    return JsonResponse(response_data)
+
+
 @require_http_methods(["GET"])
 def setup_page(request):
     """Render the setup page."""
@@ -63,11 +77,11 @@ def setup_page(request):
         from django.shortcuts import redirect
         return redirect('/')
     
-    # Read the static setup.html file and render it directly
+    # Read the static setup-local.html file and render it directly
     import os
     from django.http import HttpResponse
     
-    setup_file_path = os.path.join(settings.BASE_DIR, 'static', 'setup.html')
+    setup_file_path = os.path.join(settings.BASE_DIR, 'static', 'setup-local.html')
     with open(setup_file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
@@ -80,7 +94,7 @@ def setup_account_only_page(request):
     import os
     from django.http import HttpResponse
     
-    setup_file_path = os.path.join(settings.BASE_DIR, 'static', 'setup-account.html')
+    setup_file_path = os.path.join(settings.BASE_DIR, 'static', 'setup-server.html')
     with open(setup_file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
@@ -444,10 +458,7 @@ def get_card_detail(request, card_id):
         card = client.get_card(card_id, playable=True)
         print(f"Successfully retrieved card details")
         
-        return JsonResponse({
-            'status': 'success',
-            'data': card
-        })
+        return create_response_with_tokens(client, card)
     except Exception as e:
         print(f"!!! ERROR in get_card_detail view: {type(e).__name__}: {e}")
         import traceback

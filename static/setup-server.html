@@ -231,7 +231,7 @@
         // Initialize IndexedDB
         function initDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('YotoLocalDB', 4);
+                const request = indexedDB.open('YotoLocalDB', 7);
                 
                 request.onerror = () => reject(request.error);
                 request.onsuccess = () => {
@@ -255,10 +255,14 @@
                         console.log('Creating library store');
                         db.createObjectStore('library', { keyPath: 'cardId' });
                     }
-                    if (!db.objectStoreNames.contains('images')) {
-                        console.log('Creating images store');
-                        db.createObjectStore('images', { keyPath: 'url' });
+                    // For images store, delete and recreate to ensure correct keyPath
+                    if (db.objectStoreNames.contains('images')) {
+                        console.log('Deleting existing images store to recreate with correct keyPath');
+                        db.deleteObjectStore('images');
                     }
+                    console.log('Creating images store');
+                    const imagesStore = db.createObjectStore('images', { keyPath: 'key' });
+                    imagesStore.createIndex('cardIdIndex', 'cardId');
                 };
             });
         }
